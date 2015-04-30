@@ -181,9 +181,18 @@ def run_daligner(self):
     script = []
     script.append( "source {install_prefix}/bin/activate\n".format(install_prefix = install_prefix) )
     script.append( "cd %s" % cwd )
+    #copy input to local tmpdir
+    script.append( "CWD=$PWD" )
+    #assume we are in the correct working folder
+    script.append( "cp .raw_reads.bps $TMPDIR" )
+    script.append( "cp raw_reads.db $TMPDIR" )
+    script.append( "cp .raw_reads.idx $TMPDIR" )
+    script.append( "cd $TMPDIR" )
     script.append( "hostname >> %s" % log_path )
     script.append( "date >> %s" % log_path )
-    script.append( "/usr/bin/time "+ daligner_cmd + ( " >> %s 2>&1 " % log_path ) + ( " && touch %s" % fn( self.job_done ) ) )
+            #do alignment, copy output to remote dir
+    script.append( "/usr/bin/time "+ daligner_cmd + ( " >> %s 2>&1 " % log_path ) + ( " && cp *.las $CWD " ) + ( " && cd $CWD ") +
+	    ( " && touch %s" % fn( self.job_done ) ) )
 
     for p_id in xrange( 1, nblock+1 ):
         script.append( """ for f in `find $PWD -wholename "*%s.%d.%s.*.*.las"`; do ln -sf $f ../m_%05d; done """  % (db_prefix, p_id, db_prefix, p_id) )
