@@ -248,12 +248,23 @@ def run_consensus_task(self):
 
     with open( os.path.join(cwd, "cp_%05d.sh" % job_id), "w") as c_script:
         print >> c_script, "source {install_prefix}/bin/activate\n".format(install_prefix = install_prefix)
-        print >> c_script, "cd .."
-        if config["falcon_sense_skip_contained"] == True:
-            print >> c_script, """LA4Falcon -H%d -so -f:%s las_files/%s.%d.las | """ % (length_cutoff, prefix, prefix, job_id),
-        else:
-            print >> c_script, """LA4Falcon -H%d -o -f:%s las_files/%s.%d.las | """ % (length_cutoff, prefix, prefix, job_id),
-        print >> c_script, """fc_consensus.py %s > %s""" % (falcon_sense_option, fn(self.out_file))
+	print >> c_script, "cd .."
+	#now we are at the top-level result folder e.g. 0-rawreads
+	#copy .las and 3 db files to $TMPDIR
+	print >> c_script, "CWD=$PWD\n"
+	print >> c_script, "cp .raw_reads.bps $TMPDIR\n"
+	print >> c_script, "cp raw_reads.db $TMPDIR\n"
+	print >> c_script, "cp .raw_reads.idx $TMPDIR\n"
+	print >> c_script, "cp las_files/%s.%d.las $TMPDIR\n" % (prefix, job_id)
+	print >> c_script, "cd $TMPDIR\n"
+
+	if config["falcon_sense_skip_contained"] == True:
+	    print >> c_script, """LA4Falcon -H%d -so -f:%s %s.%d.las | """ % (length_cutoff, prefix, prefix, job_id),
+	else:
+	    print >> c_script, """LA4Falcon -H%d -o -f:%s %s.%d.las | """ % (length_cutoff, prefix, prefix, job_id),
+	print >> c_script, """fc_consensus.py %s > %s""" % (falcon_sense_option, os.path.basename(fn(self.out_file)))
+	print >> c_script, "cp %s %s" % (os.path.basename(fn(self.out_file)),fn(self.out_file))
+	print >> c_script, "cd $CWD\n"
 
     script = []
     script.append( "source {install_prefix}/bin/activate\n".format(install_prefix = install_prefix) )
