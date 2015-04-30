@@ -184,9 +184,9 @@ def run_daligner(self):
     #copy input to local tmpdir
     script.append( "CWD=$PWD" )
     #assume we are in the correct working folder
-    script.append( "cp .raw_reads.bps $TMPDIR" )
-    script.append( "cp raw_reads.db $TMPDIR" )
-    script.append( "cp .raw_reads.idx $TMPDIR" )
+    script.append( "cp .%s.bps $TMPDIR" % (db_prefix)) 
+    script.append( "cp %s.db $TMPDIR" % (db_prefix) )
+    script.append( "cp .%s.idx $TMPDIR" % (db_prefix) )
     script.append( "cd $TMPDIR" )
     script.append( "hostname >> %s" % log_path )
     script.append( "date >> %s" % log_path )
@@ -261,9 +261,9 @@ def run_consensus_task(self):
 	#now we are at the top-level result folder e.g. 0-rawreads
 	#copy .las and 3 db files to $TMPDIR
 	print >> c_script, "CWD=$PWD"
-	print >> c_script, "cp .raw_reads.bps $TMPDIR"
-	print >> c_script, "cp raw_reads.db $TMPDIR"
-	print >> c_script, "cp .raw_reads.idx $TMPDIR"
+	print >> c_script, "cp .%s.bps $TMPDIR" % (prefix)
+	print >> c_script, "cp %s.db $TMPDIR" % (prefix)
+	print >> c_script, "cp .%s.idx $TMPDIR" % (prefix)
 	print >> c_script, "cp las_files/%s.%d.las $TMPDIR" % (prefix, job_id)
 	print >> c_script, "cd $TMPDIR"
 
