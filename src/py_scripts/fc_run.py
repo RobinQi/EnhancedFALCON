@@ -251,12 +251,12 @@ def run_consensus_task(self):
 	print >> c_script, "cd .."
 	#now we are at the top-level result folder e.g. 0-rawreads
 	#copy .las and 3 db files to $TMPDIR
-	print >> c_script, "CWD=$PWD\n"
-	print >> c_script, "cp .raw_reads.bps $TMPDIR\n"
-	print >> c_script, "cp raw_reads.db $TMPDIR\n"
-	print >> c_script, "cp .raw_reads.idx $TMPDIR\n"
-	print >> c_script, "cp las_files/%s.%d.las $TMPDIR\n" % (prefix, job_id)
-	print >> c_script, "cd $TMPDIR\n"
+	print >> c_script, "CWD=$PWD"
+	print >> c_script, "cp .raw_reads.bps $TMPDIR"
+	print >> c_script, "cp raw_reads.db $TMPDIR"
+	print >> c_script, "cp .raw_reads.idx $TMPDIR"
+	print >> c_script, "cp las_files/%s.%d.las $TMPDIR" % (prefix, job_id)
+	print >> c_script, "cd $TMPDIR"
 
 	if config["falcon_sense_skip_contained"] == True:
 	    print >> c_script, """LA4Falcon -H%d -so -f:%s %s.%d.las | """ % (length_cutoff, prefix, prefix, job_id),
@@ -264,7 +264,7 @@ def run_consensus_task(self):
 	    print >> c_script, """LA4Falcon -H%d -o -f:%s %s.%d.las | """ % (length_cutoff, prefix, prefix, job_id),
 	print >> c_script, """fc_consensus.py %s > %s""" % (falcon_sense_option, os.path.basename(fn(self.out_file)))
 	print >> c_script, "cp %s %s" % (os.path.basename(fn(self.out_file)),fn(self.out_file))
-	print >> c_script, "cd $CWD\n"
+	print >> c_script, "cd $CWD"
 
     script = []
     script.append( "source {install_prefix}/bin/activate\n".format(install_prefix = install_prefix) )
@@ -396,12 +396,20 @@ def create_merge_tasks(wd, db_prefix, input_dep, config):
         except OSError:
             pass
 
-        with open("%s/m_%05d/m_%05d.sh" % (wd, p_id, p_id), "w") as merge_script:
-            #print >> merge_script, """for f in `find .. -wholename "*job*/%s.%d.%s.*.*.las"`; do ln -sf $f .; done""" % (db_prefix, p_id, db_prefix)
-            for l in s_data:
-                print >> merge_script, l
-            print >> merge_script, "ln -sf ../m_%05d/%s.%d.las ../las_files" % (p_id, db_prefix, p_id) 
-            print >> merge_script, "ln -sf ./m_%05d/%s.%d.las .. " % (p_id, db_prefix, p_id) 
+	with open("%s/m_%05d/m_%05d.sh" % (wd, p_id, p_id), "w") as merge_script:
+	    #print >> merge_script, """for f in `find .. -wholename "*job*/%s.%d.%s.*.*.las"`; do ln -sf $f .; done""" % (db_prefix, p_id, db_prefix)
+	    #copy input to local tmpdir
+	    print >> merge_script, "CWD=$PWD"
+	    #assume we are in the correct working folder
+	    print >> merge_script, "cp *.las $TMPDIR"
+	    print >> merge_script, "cd $TMPDIR"
+	    for l in s_data:
+		print >> merge_script, l
+            #copy output to remote dir
+	    print >> merge_script, "cd $CWD"
+	    print >> merge_script, "cp $TMPDIR/%s.%d.las %s.%d.las" % (db_prefix,p_id,db_prefix,p_id)
+	    print >> merge_script, "ln -sf ../m_%05d/%s.%d.las ../las_files" % (p_id, db_prefix, p_id) 
+	    print >> merge_script, "ln -sf ./m_%05d/%s.%d.las .. " % (p_id, db_prefix, p_id) 
             
         merge_script_file = os.path.abspath( "%s/m_%05d/m_%05d.sh" % (wd, p_id, p_id) )
         job_done = makePypeLocalFile(os.path.abspath( "%s/m_%05d/m_%05d_done" % (wd, p_id, p_id)  ))
