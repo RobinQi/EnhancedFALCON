@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/home/yunfeiguo/Downloads/falcon_install/wanglab_falcon_installation/fc_env/bin/python
 
 #################################################################################$$
 # Copyright (c) 2011-2014, Pacific Biosciences of California, Inc.
@@ -50,6 +50,8 @@ import re
 import time
 import logging
 import uuid
+import random
+import string
 
 
 wait_time = 5
@@ -140,6 +142,7 @@ def build_rdb(self):
 
 
     with open(script_fn,"w") as script_file:
+	script_file.write("set -e")
         script_file.write("source {install_prefix}/bin/activate\n".format(install_prefix = install_prefix))
         script_file.write("cd {work_dir}\n".format(work_dir = work_dir))
         script_file.write("hostname >> db_build.log\n")
@@ -153,6 +156,11 @@ def build_rdb(self):
             script_file.write("""LB=$(cat raw_reads.db | awk '$1 == "blocks" {print $3}')\n""")
         script_file.write("HPCdaligner %s -H%d raw_reads %d-$LB > run_jobs.sh\n" % (pa_HPCdaligner_option, length_cutoff, last_block))
 
+	#copy the DB files to tmpdir_for_daligner_input, just to reduce IO burden on storage node
+	script_file.write("pdsh -w %s mkdir %s" %(config["node_template"], config["tmpdir_for_daligner_input"]))
+	script_file.write("pdsh -w %s cp raw_reads.db %s" % (config["node_template"], config["tmpdir_for_daligner_input"])
+	script_file.write("pdsh -w %s cp .raw_reads.bps %s" % (config["node_template"], config["tmpdir_for_daligner_input"])
+	script_file.write("pdsh -w %s cp .raw_reads.idx %s" % (config["node_template"], config["tmpdir_for_daligner_input"])
         script_file.write("touch {rdb_build_done}\n".format(rdb_build_done = fn(rdb_build_done)))
 
     job_name = self.URL.split("/")[-1]
@@ -179,14 +187,19 @@ def run_daligner(self):
     log_path = os.path.join( script_dir, "rj_%s.log" % (job_uid))
 
     script = []
+    script.append("set -e")
     script.append( "source {install_prefix}/bin/activate\n".format(install_prefix = install_prefix) )
     script.append( "cd %s" % cwd )
     #copy input to local tmpdir
     script.append( "CWD=$PWD" )
     #assume we are in the correct working folder
+    script.append( "echo cp starts >> %s" % log_path )
+    script.append( "date >> %s" % log_path )
     script.append( "cp .%s.bps $TMPDIR" % (db_prefix)) 
     script.append( "cp %s.db $TMPDIR" % (db_prefix) )
     script.append( "cp .%s.idx $TMPDIR" % (db_prefix) )
+    script.append( "date >> %s" % log_path )
+    script.append( "echo cp ends >> %s" % log_path )
     script.append( "cd $TMPDIR" )
     script.append( "hostname >> %s" % log_path )
     script.append( "date >> %s" % log_path )
@@ -550,7 +563,13 @@ def get_config(config_fn):
         print """ No target specified, assuming "assembly" as target """
         target = "assembly"
 
-
+    tmpdir_for_daligner_input = '/tmp'
+    if config.has_option('General','tmpdir_for_daligner_input'):
+	tmpdir_for_daligner_input = config.get('General','tmpdir_for_daligner_input')
+    #generate a random folder for storing DALIGNER input
+    #this is to avoid name confilct with other falcon instances
+    tmpdir_for_daligner_input = os.path.join(tmpdir_for_daligner_input,
+	    ''.join(random.SystemRandom().choice(string.ascii_uppercase + string.digits) for _ in range(10)))
     hgap_config = {"input_fofn_fn" : input_fofn_fn,
                    "target" : target,
                    "job_type" : job_type,
@@ -573,7 +592,9 @@ def get_config(config_fn):
                    "pa_DBsplit_option": pa_DBsplit_option,
                    "ovlp_DBsplit_option": ovlp_DBsplit_option,
                    "falcon_sense_option": falcon_sense_option,
-                   "falcon_sense_skip_contained": falcon_sense_skip_contained
+                   "falcon_sense_skip_contained": falcon_sense_skip_contained,
+		   "tmpdir_for_daligner_input":tmpdir_for_daligner_input,
+		   "node_template":config.get('General','node_template'),
                    }
 
     hgap_config["install_prefix"] = sys.prefix
