@@ -186,6 +186,13 @@ def run_daligner(self):
     script_fn =  os.path.join( script_dir , "rj_%s.sh" % (job_uid))
     log_path = os.path.join( script_dir, "rj_%s.log" % (job_uid))
 
+    input_bps = ".%s.bps" % (db_prefix)
+    input_idx = ".%s.idx" % (db_prefix)
+    input_db = "%s.db" % (db_prefix)
+    tmp_input_bps = os.path.join(config["tmpdir_for_daligner_input"],input_bps),
+    tmp_input_idx = os.path.join(config["tmpdir_for_daligner_input"],input_idx),
+    tmp_input_db = os.path.join(config["tmpdir_for_daligner_input"],input_db),
+
     script = []
     script.append("set -e")
     script.append( "source {install_prefix}/bin/activate\n".format(install_prefix = install_prefix) )
@@ -193,14 +200,26 @@ def run_daligner(self):
     #copy input to local tmpdir
     script.append( "CWD=$PWD" )
     #assume we are in the correct working folder
+    #if db files exist and file size matches, then we use them
+    #otherwise we copy the original
+    #only check the largest file .bps, just to save some code
+    script.append("if [ ! -f %s ] || [ $(stat -c%%s %s ) -ne $(stat -c%%s %s ) ]; then" % (
+	    tmp_input_bps,tmp_input_bps,input_bps
+	    ))
     script.append( "echo cp starts >> %s" % log_path )
     script.append( "date >> %s" % log_path )
-    script.append( "cp .%s.bps $TMPDIR" % (db_prefix)) 
-    script.append( "cp %s.db $TMPDIR" % (db_prefix) )
-    script.append( "cp .%s.idx $TMPDIR" % (db_prefix) )
+    script.append( "cp %s $TMPDIR" % (input_bps)) 
+    script.append( "cp %s $TMPDIR" % (input_db) )
+    script.append( "cp %s $TMPDIR" % (input_idx) )
     script.append( "date >> %s" % log_path )
     script.append( "echo cp ends >> %s" % log_path )
     script.append( "cd $TMPDIR" )
+    script.append( "else")
+    script.append( "cd $TMPDIR" )
+    script.append( "ln -sf %s %s" % (tmp_input_bps,input_bps) )
+    script.append( "ln -sf %s %s" % (tmp_input_idx,input_idx) )
+    script.append( "ln -sf %s %s" % (tmp_input_db,input_db) )
+    script.append( "fi")
     script.append( "hostname >> %s" % log_path )
     script.append( "date >> %s" % log_path )
             #do alignment, copy output to remote dir
@@ -268,17 +287,41 @@ def run_consensus_task(self):
     falcon_sense_option = config["falcon_sense_option"]
     length_cutoff = config["length_cutoff"]
 
+    input_bps = ".%s.bps" % (prefix)
+    input_idx = ".%s.idx" % (prefix)
+    input_db = "%s.db" % (prefix)
+    tmp_input_bps = os.path.join(config["tmpdir_for_daligner_input"],input_bps),
+    tmp_input_idx = os.path.join(config["tmpdir_for_daligner_input"],input_idx),
+    tmp_input_db = os.path.join(config["tmpdir_for_daligner_input"],input_db),
+
     with open( os.path.join(cwd, "cp_%05d.sh" % job_id), "w") as c_script:
+        print >> c_script, "set -e"
         print >> c_script, "source {install_prefix}/bin/activate\n".format(install_prefix = install_prefix)
 	print >> c_script, "cd .."
 	#now we are at the top-level result folder e.g. 0-rawreads
 	#copy .las and 3 db files to $TMPDIR
-	print >> c_script, "CWD=$PWD"
-	print >> c_script, "cp .%s.bps $TMPDIR" % (prefix)
-	print >> c_script, "cp %s.db $TMPDIR" % (prefix)
-	print >> c_script, "cp .%s.idx $TMPDIR" % (prefix)
 	print >> c_script, "cp las_files/%s.%d.las $TMPDIR" % (prefix, job_id)
-	print >> c_script, "cd $TMPDIR"
+	print >> c_script, "CWD=$PWD"
+        #if db files exist and file size matches, then we use them
+        #otherwise we copy the original
+        #only check the largest file .bps, just to save some code
+        print >> c_script, "if [ ! -f %s ] || [ $(stat -c%%s %s ) -ne $(stat -c%%s %s ) ]; then" % (
+                tmp_input_bps,tmp_input_bps,input_bps
+                ))
+        print >> c_script,  "echo cp starts >> %s" % log_path )
+        print >> c_script,  "date >> %s" % log_path )
+        print >> c_script,  "cp %s $TMPDIR" % (input_bps)) 
+        print >> c_script,  "cp %s $TMPDIR" % (input_db) )
+        print >> c_script,  "cp %s $TMPDIR" % (input_idx) )
+        print >> c_script,  "date >> %s" % log_path )
+        print >> c_script,  "echo cp ends >> %s" % log_path )
+        print >> c_script,  "cd $TMPDIR" )
+        print >> c_script,  "else")
+        print >> c_script,  "cd $TMPDIR" )
+        print >> c_script,  "ln -sf %s %s" % (tmp_input_bps,input_bps) )
+        print >> c_script,  "ln -sf %s %s" % (tmp_input_idx,input_idx) )
+        print >> c_script,  "ln -sf %s %s" % (tmp_input_db,input_db) )
+        print >> c_script,  "fi")
 
 	if config["falcon_sense_skip_contained"] == True:
 	    print >> c_script, """LA4Falcon -H%d -so -f:%s %s.%d.las | """ % (length_cutoff, prefix, prefix, job_id),
@@ -289,6 +332,7 @@ def run_consensus_task(self):
 	print >> c_script, "cd $CWD"
 
     script = []
+    script.append( "set -e")
     script.append( "source {install_prefix}/bin/activate\n".format(install_prefix = install_prefix) )
     script.append( "cd %s" % cwd )
     script.append( "hostname >> %s" % log_path )
@@ -570,6 +614,9 @@ def get_config(config_fn):
     #this is to avoid name confilct with other falcon instances
     tmpdir_for_daligner_input = os.path.join(tmpdir_for_daligner_input,
 	    ''.join(random.SystemRandom().choice(string.ascii_uppercase + string.digits) for _ in range(10)))
+    if !config.has_option('General','node_template'):
+	print """node_template is missing in configuration file."""
+	sys.exit(1)
     hgap_config = {"input_fofn_fn" : input_fofn_fn,
                    "target" : target,
                    "job_type" : job_type,
@@ -726,6 +773,11 @@ if __name__ == '__main__':
         os.system("cd %s; fasta2DB preads preads_norm.fasta" % pread_dir)
         os.system("cd %s; DBsplit %s preads" % (pread_dir, config["ovlp_DBsplit_option"]))
         os.system("cd %s; HPCdaligner %s preads > run_jobs.sh" % (pread_dir, config["ovlp_HPCdaligner_option"]))
+	#copy the DB files to tmpdir_for_daligner_input, just to reduce IO burden on storage node
+	os.system("pdsh -w %s mkdir %s" %(config["node_template"], config["tmpdir_for_daligner_input"]))
+	os.system("pdsh -w %s cp preads.db %s" % (config["node_template"], config["tmpdir_for_daligner_input"])
+	os.system("pdsh -w %s cp .preads.bps %s" % (config["node_template"], config["tmpdir_for_daligner_input"])
+	os.system("pdsh -w %s cp .preads.idx %s" % (config["node_template"], config["tmpdir_for_daligner_input"])
         os.system("cd %s; touch rdb_build_done" % pread_dir)
 
     wf.addTask(build_p_rdb_task)
