@@ -1,4 +1,4 @@
-#!/home/yunfeiguo/Downloads/falcon_install/wanglab_falcon_installation/fc_env/bin/python
+#!/home/yunfeiguo/Downloads/falcon_install/wanglab_falcon_trial_installation/fc_env/bin/python
 
 #################################################################################$$
 # Copyright (c) 2011-2014, Pacific Biosciences of California, Inc.
@@ -142,7 +142,7 @@ def build_rdb(self):
 
 
     with open(script_fn,"w") as script_file:
-	script_file.write("set -e")
+	script_file.write("set -e\n")
         script_file.write("source {install_prefix}/bin/activate\n".format(install_prefix = install_prefix))
         script_file.write("cd {work_dir}\n".format(work_dir = work_dir))
         script_file.write("hostname >> db_build.log\n")
@@ -156,11 +156,16 @@ def build_rdb(self):
             script_file.write("""LB=$(cat raw_reads.db | awk '$1 == "blocks" {print $3}')\n""")
         script_file.write("HPCdaligner %s -H%d raw_reads %d-$LB > run_jobs.sh\n" % (pa_HPCdaligner_option, length_cutoff, last_block))
 
+	input_db = os.path.join(work_dir,"raw_reads.db")
+	input_bps = os.path.join(work_dir,".raw_reads.bps")
+	input_idx = os.path.join(work_dir,".raw_reads.idx")
 	#copy the DB files to tmpdir_for_daligner_input, just to reduce IO burden on storage node
-	script_file.write("pdsh -w %s mkdir %s" %(config["node_template"], config["tmpdir_for_daligner_input"]))
-	script_file.write("pdsh -w %s cp raw_reads.db %s" % (config["node_template"], config["tmpdir_for_daligner_input"])
-	script_file.write("pdsh -w %s cp .raw_reads.bps %s" % (config["node_template"], config["tmpdir_for_daligner_input"])
-	script_file.write("pdsh -w %s cp .raw_reads.idx %s" % (config["node_template"], config["tmpdir_for_daligner_input"])
+	#use '| true' to let it time out silently in case some nodes are not responsive
+	for i in config["node_template"]:
+	    script_file.write("timeout %s ssh %s mkdir %s | true\n" %(config["ssh_timeout"],i, config["tmpdir_for_daligner_input"]))
+	    script_file.write("timeout %s ssh %s cp %s %s | true\n" % (config["ssh_timeout"],i, input_db, config["tmpdir_for_daligner_input"]))
+	    script_file.write("timeout %s ssh %s cp %s %s | true\n" % (config["ssh_timeout"],i, input_bps, config["tmpdir_for_daligner_input"]))
+	    script_file.write("timeout %s ssh %s cp %s %s | true\n" % (config["ssh_timeout"],i, input_idx, config["tmpdir_for_daligner_input"]))
         script_file.write("touch {rdb_build_done}\n".format(rdb_build_done = fn(rdb_build_done)))
 
     job_name = self.URL.split("/")[-1]
@@ -186,12 +191,12 @@ def run_daligner(self):
     script_fn =  os.path.join( script_dir , "rj_%s.sh" % (job_uid))
     log_path = os.path.join( script_dir, "rj_%s.log" % (job_uid))
 
-    input_bps = ".%s.bps" % (db_prefix)
-    input_idx = ".%s.idx" % (db_prefix)
-    input_db = "%s.db" % (db_prefix)
-    tmp_input_bps = os.path.join(config["tmpdir_for_daligner_input"],input_bps),
-    tmp_input_idx = os.path.join(config["tmpdir_for_daligner_input"],input_idx),
-    tmp_input_db = os.path.join(config["tmpdir_for_daligner_input"],input_db),
+    input_bps = ".%s.bps" % db_prefix
+    input_idx = ".%s.idx" % db_prefix
+    input_db = "%s.db" % db_prefix
+    tmp_input_bps = os.path.join(config["tmpdir_for_daligner_input"],input_bps)
+    tmp_input_idx = os.path.join(config["tmpdir_for_daligner_input"],input_idx)
+    tmp_input_db = os.path.join(config["tmpdir_for_daligner_input"],input_db)
 
     script = []
     script.append("set -e")
@@ -290,9 +295,9 @@ def run_consensus_task(self):
     input_bps = ".%s.bps" % (prefix)
     input_idx = ".%s.idx" % (prefix)
     input_db = "%s.db" % (prefix)
-    tmp_input_bps = os.path.join(config["tmpdir_for_daligner_input"],input_bps),
-    tmp_input_idx = os.path.join(config["tmpdir_for_daligner_input"],input_idx),
-    tmp_input_db = os.path.join(config["tmpdir_for_daligner_input"],input_db),
+    tmp_input_bps = os.path.join(config["tmpdir_for_daligner_input"],input_bps)
+    tmp_input_idx = os.path.join(config["tmpdir_for_daligner_input"],input_idx)
+    tmp_input_db = os.path.join(config["tmpdir_for_daligner_input"],input_db)
 
     with open( os.path.join(cwd, "cp_%05d.sh" % job_id), "w") as c_script:
         print >> c_script, "set -e"
@@ -307,21 +312,21 @@ def run_consensus_task(self):
         #only check the largest file .bps, just to save some code
         print >> c_script, "if [ ! -f %s ] || [ $(stat -c%%s %s ) -ne $(stat -c%%s %s ) ]; then" % (
                 tmp_input_bps,tmp_input_bps,input_bps
-                ))
-        print >> c_script,  "echo cp starts >> %s" % log_path )
-        print >> c_script,  "date >> %s" % log_path )
-        print >> c_script,  "cp %s $TMPDIR" % (input_bps)) 
-        print >> c_script,  "cp %s $TMPDIR" % (input_db) )
-        print >> c_script,  "cp %s $TMPDIR" % (input_idx) )
-        print >> c_script,  "date >> %s" % log_path )
-        print >> c_script,  "echo cp ends >> %s" % log_path )
-        print >> c_script,  "cd $TMPDIR" )
-        print >> c_script,  "else")
-        print >> c_script,  "cd $TMPDIR" )
-        print >> c_script,  "ln -sf %s %s" % (tmp_input_bps,input_bps) )
-        print >> c_script,  "ln -sf %s %s" % (tmp_input_idx,input_idx) )
-        print >> c_script,  "ln -sf %s %s" % (tmp_input_db,input_db) )
-        print >> c_script,  "fi")
+                )
+        print >> c_script,  "echo cp starts >> %s" % log_path 
+        print >> c_script,  "date >> %s" % log_path 
+        print >> c_script,  "cp %s $TMPDIR" % (input_bps)
+        print >> c_script,  "cp %s $TMPDIR" % (input_db) 
+        print >> c_script,  "cp %s $TMPDIR" % (input_idx)
+        print >> c_script,  "date >> %s" % log_path 
+        print >> c_script,  "echo cp ends >> %s" % log_path 
+        print >> c_script,  "cd $TMPDIR" 
+        print >> c_script,  "else"
+        print >> c_script,  "cd $TMPDIR" 
+        print >> c_script,  "ln -sf %s %s" % (tmp_input_bps,input_bps) 
+        print >> c_script,  "ln -sf %s %s" % (tmp_input_idx,input_idx) 
+        print >> c_script,  "ln -sf %s %s" % (tmp_input_db,input_db) 
+        print >> c_script,  "fi"
 
 	if config["falcon_sense_skip_contained"] == True:
 	    print >> c_script, """LA4Falcon -H%d -so -f:%s %s.%d.las | """ % (length_cutoff, prefix, prefix, job_id),
@@ -514,6 +519,19 @@ def create_merge_tasks(wd, db_prefix, input_dep, config):
     return merge_tasks, merge_out, consensus_tasks, consensus_out
 
 
+def convertNodeTemplate2List (l):
+    result = []
+    matchObj = re.match(r'(.*)\[(\d+)-(\d+)\]',l)
+    if matchObj:
+        prefix = matchObj.groups()[0]
+        start = int(matchObj.groups()[1])
+        end = int(matchObj.groups()[2])
+	for i in range(start,end+1):
+            result.append(prefix + str(i))
+    else:
+        print 'compute-0-[0-31] expected for node_template'
+        sys.exit(1)
+    return result
 
 def get_config(config_fn):
 
@@ -608,15 +626,25 @@ def get_config(config_fn):
         target = "assembly"
 
     tmpdir_for_daligner_input = '/tmp'
-    if config.has_option('General','tmpdir_for_daligner_input'):
+    if not config.has_option('General','tmpdir_for_daligner_input'):
+	print 'tmpdir_for_daligner_input missing'
+	sys.exit(1)
+    else:	
 	tmpdir_for_daligner_input = config.get('General','tmpdir_for_daligner_input')
-    #generate a random folder for storing DALIGNER input
-    #this is to avoid name confilct with other falcon instances
-    tmpdir_for_daligner_input = os.path.join(tmpdir_for_daligner_input,
-	    ''.join(random.SystemRandom().choice(string.ascii_uppercase + string.digits) for _ in range(10)))
-    if !config.has_option('General','node_template'):
+    #do not use random folder, unless it is saved somewhere, it will change every time
+    ##generate a random folder for storing DALIGNER input
+    ##this is to avoid name confilct with other falcon instances
+    #tmpdir_for_daligner_input = os.path.join(tmpdir_for_daligner_input,
+    #        ''.join(random.SystemRandom().choice(string.ascii_uppercase + string.digits) for _ in range(10)))
+    if not config.has_option('General','node_template'):
 	print """node_template is missing in configuration file."""
 	sys.exit(1)
+    node_template = convertNodeTemplate2List(config.get('General','node_template'))
+
+    #default timeout 1 hour
+    ssh_timeout = '1h'
+    if config.has_option('General','ssh_timeout'):
+	ssh_timeout = config.get('General','ssh_timeout')
     hgap_config = {"input_fofn_fn" : input_fofn_fn,
                    "target" : target,
                    "job_type" : job_type,
@@ -641,7 +669,8 @@ def get_config(config_fn):
                    "falcon_sense_option": falcon_sense_option,
                    "falcon_sense_skip_contained": falcon_sense_skip_contained,
 		   "tmpdir_for_daligner_input":tmpdir_for_daligner_input,
-		   "node_template":config.get('General','node_template'),
+		   "node_template":node_template,
+		   "ssh_timeout":ssh_timeout,
                    }
 
     hgap_config["install_prefix"] = sys.prefix
@@ -770,14 +799,19 @@ if __name__ == '__main__':
                         print >> p_norm, r.sequence[ i *80 : (i + 1) * 80]
                     print >> p_norm, r.sequence[(i+1)*80:]
                     c += 1
+        input_db = os.path.join(pread_dir,"preads.db")
+        input_idx = os.path.join(pread_dir,".preads.idx")
+        input_bps = os.path.join(pread_dir,".preads.bps")
         os.system("cd %s; fasta2DB preads preads_norm.fasta" % pread_dir)
         os.system("cd %s; DBsplit %s preads" % (pread_dir, config["ovlp_DBsplit_option"]))
         os.system("cd %s; HPCdaligner %s preads > run_jobs.sh" % (pread_dir, config["ovlp_HPCdaligner_option"]))
 	#copy the DB files to tmpdir_for_daligner_input, just to reduce IO burden on storage node
-	os.system("pdsh -w %s mkdir %s" %(config["node_template"], config["tmpdir_for_daligner_input"]))
-	os.system("pdsh -w %s cp preads.db %s" % (config["node_template"], config["tmpdir_for_daligner_input"])
-	os.system("pdsh -w %s cp .preads.bps %s" % (config["node_template"], config["tmpdir_for_daligner_input"])
-	os.system("pdsh -w %s cp .preads.idx %s" % (config["node_template"], config["tmpdir_for_daligner_input"])
+	#use '| true' to let it time out silently in case some nodes are not responsive
+	for i in config["node_template"]:
+	    os.system("timeout %s ssh %s mkdir %s | true" %(config["ssh_timeout"],i, config["tmpdir_for_daligner_input"]))
+	    os.system("timeout %s ssh %s cp %s %s | true" % (config["ssh_timeout"],i, input_db,config["tmpdir_for_daligner_input"]))
+	    os.system("timeout %s ssh %s cp %s %s | true" % (config["ssh_timeout"],i, input_idx,config["tmpdir_for_daligner_input"]))
+	    os.system("timeout %s ssh %s cp %s %s | true" % (config["ssh_timeout"],i, input_bps,config["tmpdir_for_daligner_input"]))
         os.system("cd %s; touch rdb_build_done" % pread_dir)
 
     wf.addTask(build_p_rdb_task)
