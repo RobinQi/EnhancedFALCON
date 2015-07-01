@@ -208,7 +208,8 @@ def run_daligner(self):
     #if db files exist and file size matches, then we use them
     #otherwise we copy the original
     #only check the largest file .bps, just to save some code
-    script.append("if [ ! -f %s ] || [ $(stat -c%%s %s ) -ne $(stat -c%%s %s ) ]; then" % (
+    #use -L to dereference links
+    script.append("if [ ! -f %s ] || [ $(stat -c%%s -L %s ) -ne $(stat -c%%s -L %s ) ]; then" % (
 	    tmp_input_bps,tmp_input_bps,input_bps
 	    ))
     script.append( "echo cp starts >> %s" % log_path )
@@ -310,7 +311,7 @@ def run_consensus_task(self):
         #if db files exist and file size matches, then we use them
         #otherwise we copy the original
         #only check the largest file .bps, just to save some code
-        print >> c_script, "if [ ! -f %s ] || [ $(stat -c%%s %s ) -ne $(stat -c%%s %s ) ]; then" % (
+        print >> c_script, "if [ ! -f %s ] || [ $(stat -c%%s -L %s ) -ne $(stat -c%%s -L %s ) ]; then" % (
                 tmp_input_bps,tmp_input_bps,input_bps
                 )
         print >> c_script,  "echo cp starts >> %s" % log_path 
