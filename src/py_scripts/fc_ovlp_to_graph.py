@@ -1,42 +1,3 @@
-#!/usr/bin/env python
-
-#################################################################################$$
-# Copyright (c) 2011-2014, Pacific Biosciences of California, Inc.
-#
-# All rights reserved.
-#
-# Redistribution and use in source and binary forms, with or without
-# modification, are permitted (subject to the limitations in the
-# disclaimer below) provided that the following conditions are met:
-#
-#  * Redistributions of source code must retain the above copyright
-#  notice, this list of conditions and the following disclaimer.
-#
-#  * Redistributions in binary form must reproduce the above
-#  copyright notice, this list of conditions and the following
-#  disclaimer in the documentation and/or other materials provided
-#  with the distribution.
-#
-#  * Neither the name of Pacific Biosciences nor the names of its
-#  contributors may be used to endorse or promote products derived
-#  from this software without specific prior written permission.
-#
-# NO EXPRESS OR IMPLIED LICENSES TO ANY PARTY'S PATENT RIGHTS ARE
-# GRANTED BY THIS LICENSE. THIS SOFTWARE IS PROVIDED BY PACIFIC
-# BIOSCIENCES AND ITS CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED
-# WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
-# OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-# DISCLAIMED. IN NO EVENT SHALL PACIFIC BIOSCIENCES OR ITS
-# CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-# SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-# LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
-# USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
-# ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
-# OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
-# SUCH DAMAGE.
-#################################################################################$$
-
 #from pbcore.io import FastaReader
 import networkx as nx
 import os
@@ -241,15 +202,19 @@ class StringGraph(object):
 
             out_edges = self.nodes[v].out_edges
             if len(out_edges) > 0:
-                out_edges.sort(key=lambda e: e.attr["score"])
-                e = out_edges[-1]
-                best_edges.add( (e.in_node.name, e.out_node.name) )
+                out_edges.sort(key=lambda e: -e.attr["score"])
+                for e in out_edges:
+                    if self.e_reduce[ (e.in_node.name, e.out_node.name) ] != True:
+                        best_edges.add( (e.in_node.name, e.out_node.name) )
+                        break
 
             in_edges = self.nodes[v].in_edges
             if len(in_edges) > 0:
-                in_edges.sort(key=lambda e: e.attr["score"])
-                e = in_edges[-1]
-                best_edges.add( (e.in_node.name, e.out_node.name) )
+                in_edges.sort(key=lambda e: -e.attr["score"])
+                for e in in_edges:
+                    if self.e_reduce[ (e.in_node.name, e.out_node.name) ] != True:
+                        best_edges.add( (e.in_node.name, e.out_node.name) )
+                        break
 
         if DEBUG_LOG_LEVEL > 1:
             print "X", len(best_edges)
@@ -269,11 +234,6 @@ class StringGraph(object):
 
     def resolve_repeat_edges(self):
 
-        #nxsg = nx.DiGraph()
-        #for v, w in self.edges:
-        #    if self.e_reduce[(v, w)] != True:
-        #        nxsg.add_edge(v, w)
-        #nxsg_r = nxsg.reverse()
 
         edges_to_reduce = []
         nodes_to_test = set()
@@ -322,10 +282,6 @@ class StringGraph(object):
                 for e in self.nodes[ww].in_edges:
                     if self.e_reduce[ ( e.in_node.name, e.out_node.name ) ] == False:
                         ww_in_count += 1
-                #print ww, ww_in_count 
-                #G1 = nx.ego_graph( nxsg,  ww, 3, undirected=False)
-                #G2 = nx.ego_graph( nxsg,  v_n, 3, undirected=False)
-                #o_overlap = len( set(G1.nodes()) & set(G2.nodes()) )
 
                 if ww != v_n and\
                    self.e_reduce[ (vv, ww) ] == False and\
@@ -350,10 +306,6 @@ class StringGraph(object):
                 for e in self.nodes[vv].out_edges:
                     if self.e_reduce[ ( e.in_node.name, e.out_node.name )] == False:
                         vv_out_count += 1
-                #print vv, vv_out_count 
-                #G1 = nx.ego_graph( nxsg_r,  vv, 3, undirected=False)
-                #G2 = nx.ego_graph( nxsg_r,  v_n, 3, undirected=False)
-                #i_overlap = len( set(G1.nodes()) & set(G2.nodes()) )
 
                 if vv != v_n and\
                    self.e_reduce[ (vv, ww) ] == False and\
@@ -430,10 +382,6 @@ def generate_seq_from_path(sg, seqs, path):
 
     return "".join(subseqs)
 
-def reverse_end( node_id ):
-    node_id, end = node_id.split(":")
-    new_end = "B" if end == "E" else "E"
-    return node_id + ":" + new_end
 
 def reverse_edge( e ):
     e1, e2 = e
@@ -630,16 +578,6 @@ def find_bundle(ug, u_edge_data, start_node, depth_cutoff, width_cutoff, length_
 
     data = start_node, end_node, bundle_edges, length_to_node[end_node], score_to_node[end_node], depth
     
-    """
-    start_node_r, end_node_r = reverse_end(end_node), reverse_end(start_node)
-    
-    bundle_edge_r = set()
-    for v, w, k in list(bundle_edges):
-        vv, ww, kk = reverse_end(w), reverse_end(v), reverse_end(k)
-        bundle_edge_r.add( (vv, ww, kk) )
-
-    data_r = start_node_r, end_node_r, bundle_edge_r, length_to_node[end_node], score_to_node[end_node], depth
-    """
     data_r = None
 
     if DEBUG_LOG_LEVEL > 1:
@@ -702,8 +640,6 @@ def generate_string_graph(args):
 
             if identity < args.min_idt: # only take record with >96% identity as overlapped reads
                 continue
-            #if score > -2000:
-            #    continue
             f_strain, f_start, f_end, f_len = (int(c) for c in l[4:8])
             g_strain, g_start, g_end, g_len = (int(c) for c in l[8:12])
 
@@ -711,8 +647,10 @@ def generate_string_graph(args):
             if f_len < args.min_len: continue
             if g_len < args.min_len: continue
             
-            # double check for proper overlap
             """
+            # double check for proper overlap
+            # this is not necessary when using DALIGNER for overlapper
+            # it may be useful if other overlappers give fuzzier alignment boundary
             if f_start > 24 and f_len - f_end > 24:  # allow 24 base tolerance on both sides of the overlapping
                 continue
             
@@ -738,7 +676,6 @@ def generate_string_graph(args):
             overlap_count[f_id] = overlap_count.get(f_id,0)+1
             overlap_count[g_id] = overlap_count.get(g_id,0)+1
             
-    #print "###", len(overlap_data), len(contained_reads)
     overlap_set = set()
     sg = StringGraph()
     for od in overlap_data:
@@ -859,7 +796,6 @@ def generate_string_graph(args):
     if DEBUG_LOG_LEVEL > 1:
         print sum( [1 for c in sg.e_reduce.values() if c == False] )
 
-    #max_score = max([ sg.edges[ e ].attr["score"] for e in sg.edges if sg.e_reduce[e] != True ])
     out_f = open("sg_edges_list", "w")
     nxsg = nx.DiGraph()
     edge_data = {}
@@ -918,26 +854,33 @@ def construct_compound_paths(ug, u_edge_data):
     compound_paths_0 = []
     for p in list(branch_nodes):
         if ug.out_degree(p) > 1:
-            coverage, data, data_r =  find_bundle(ug, u_edge_data, p, 32, 8, 500000)
+            coverage, data, data_r =  find_bundle(ug, u_edge_data, p, 48, 16, 500000)
             if coverage == True:
                 start_node, end_node, bundle_edges, length, score, depth = data
                 compound_paths_0.append(  (start_node, "NA", end_node, 1.0*len(bundle_edges)/depth, length, score, bundle_edges ) )
 
-    compound_paths_0.sort( key=lambda x: -x[5] )
+    compound_paths_0.sort( key=lambda x: -len(x[6]) )
 
 
     edge_to_cpath = {}
     compound_paths_1 = {}
     for s, v, t, width, length, score, bundle_edges in compound_paths_0:
+        if DEBUG_LOG_LEVEL > 1:
+            print "constructing utg, test ", s,v, t
+        
         overlapped = False
         for vv, ww, kk in list(bundle_edges):
             if (vv, ww, kk) in edge_to_cpath:
+                if DEBUG_LOG_LEVEL > 1:
+                    print "remove overlapped utg", (s, v, t), (vv, ww, kk)
                 overlapped = True
                 break
             rvv = reverse_end(vv)
             rww = reverse_end(ww)
             rkk = reverse_end(kk)
-            if (vv, ww, kk) in edge_to_cpath:
+            if (rww, rvv, rkk) in edge_to_cpath:
+                if DEBUG_LOG_LEVEL > 1:
+                    print "remove overlapped r utg", (s, v, t),  (rww, rvv, rkk)
                 overlapped = True
                 break
             
@@ -1099,13 +1042,10 @@ if __name__ == "__main__":
         path_length =0
         path_score = 0 
         for v, w in sg2.out_edges(n):
-            #print "test",v,w,path
             if (v, w) not in free_edges:
                 continue
             rv = reverse_end(v)
             rw = reverse_end(w)
-            #if (rw, rv) not in free_edges:
-            #    continue
 
             path_length = 0
             path_score = 0
@@ -1194,81 +1134,23 @@ if __name__ == "__main__":
                     path_or_edges = "~".join( path_or_edges )
                 print >>f, s, v, t, type_, length, score, path_or_edges
 
+    # identify spurs in the utg graph
+    # Currently, we use ad-hoc logic filtering out shorter utg, but we ca
+    # add proper alignment comparison later to remove redundant utgs 
+
     utg_spurs = set()
     all_nodes = ug.nodes()
-    excessive_link_nodes = set()
-
-    for n in all_nodes:
-        in_degree = len( set( e[0] for e in ug.in_edges(n))  ) # ignore mutli-edges
-        out_degree = len( set( e[1] for e in ug.out_edges(n)) )
-        if in_degree == 1 and out_degree == 1:
-            simple_nodes.add(n)
-        else:
-            if out_degree != 0:
-                s_nodes.add(n)
-            if in_degree != 0:
-                t_nodes.add(n)
-
-            if out_degree >= 2 and in_degree == 0:
-                excessive_link_nodes.add(n)
-            if in_degree >= 2 and out_degree == 0:
-                excessive_link_nodes.add(n)
-            if out_degree > 3 and in_degree < 2:
-                excessive_link_nodes.add(n)
-            if in_degree > 3 and out_degree < 2:
-                excessive_link_nodes.add(n)
-            if out_degree >= 3 and in_degree >= 3:
-                excessive_link_nodes.add(n)
-            if in_degree >= 3 and out_degree >= 3:
-                excessive_link_nodes.add(n)
-
-    spur_edges = set()
 
     ug2 = ug.copy()
+    spur_edges = set()
     edges_to_remove = set()
-
-    for n in list(excessive_link_nodes):
-        in_degree = len( set( e[0] for e in ug.in_edges(n))  ) # ignore mutli-edges
-        out_degree = len( set( e[1] for e in ug.out_edges(n)) )
-
-        for s, t, v in ug.in_edges(n, keys=True):
-            length, score, edges, type_ = u_edge_data[ (s, t, v) ]
-            if length > 30000:
-                continue
-            u_edge_data[ (s, t, v) ] = length, score, edges, "spur:1"
-            if DEBUG_LOG_LEVEL > 1:
-                print "spur:1", s,t,v, in_degree, out_degree
-            spur_edges.add( (s, t, v) )
-            edges_to_remove.add( (s, t, v) )
-            rs = reverse_end(t)
-            rt = reverse_end(s)
-            rv = reverse_end(v)
-            edges_to_remove.add( (rs, rt, rv) )
-            length, score, edges, type_ = u_edge_data[ (rs, rt, rv) ]
-            u_edge_data[ (rs, rt, rv) ] = length, score, edges, "spur:1"
-
-        for s, t, v in ug.out_edges(n, keys=True):
-            length, score, edges, type_ = u_edge_data[ (s, t, v) ]
-            if length > 30000:
-                continue
-            u_edge_data[ (s, t, v) ] = length, score, edges, "spur:1"
-            if DEBUG_LOG_LEVEL > 1:
-                print "spur:1", s,t,v, in_degree, out_degree
-            spur_edges.add( (s, t, v) )
-            edges_to_remove.add( (s, t, v) )
-            rs = reverse_end(t)
-            rt = reverse_end(s)
-            rv = reverse_end(v)
-            edges_to_remove.add( (rs, rt, rv) )
-            length, score, edges, type_ = u_edge_data[ (rs, rt, rv) ]
-            u_edge_data[ (rs, rt, rv) ] = length, score, edges, "spur:1"
 
     for n in s_nodes:
         if ug.in_degree(n) != 0:
             continue
         for s, t, v in ug.out_edges(n, keys=True):
             length, score, edges, type_ = u_edge_data[ (s, t, v) ]
-            if length > 30000:
+            if length > 50000 and len(edges) > 3:
                 continue
             in_degree = len( set( e[0] for e in ug.in_edges(t))  ) # ignore mutli-edges
             out_degree = len( set( e[1] for e in ug.out_edges(t)) )
@@ -1288,7 +1170,7 @@ if __name__ == "__main__":
             continue
         for s, t, v in ug.in_edges(n, keys=True):
             length, score, edges, type_ = u_edge_data[ (s, t, v) ]
-            if length > 30000:
+            if length > 50000 and len(edges) > 3:
                 continue
             in_degree = len( set( e[0] for e in ug.in_edges(s))  ) # ignore mutli-edges
             out_degree = len( set( e[1] for e in ug.out_edges(s)) )
@@ -1341,12 +1223,31 @@ if __name__ == "__main__":
 
     compound_path_file.close()
 
+
+    # remove short utg using local flow consistent rule
+    """
+      short UTG like this can be removed, this kind of utg are likely artifects of repeats 
+      >____           _____>
+           \__UTG_>__/
+      <____/         \_____<
+    """
+    ug_edge_to_remove = set() 
+    for s, t, v in ug.edges(keys=True):
+        if ug2.in_degree(s) == 1 and ug2.out_degree(s) == 2 and \
+           ug2.in_degree(t) == 2 and ug2.out_degree(t) == 1:
+            length, score, path_or_edges, type_ = u_edge_data[ (s, t, v) ]
+            if length < 60000: 
+                rs = reverse_end(t)
+                rt = reverse_end(s)
+                rv = reverse_end(v)
+                ug_edge_to_remove.add( (s, t, v) )
+                ug_edge_to_remove.add( (rs, rt, rv) )
+    for s, t, v in list(ug_edge_to_remove):
+        ug2.remove_edge(s, t, key=v)
+        length, score, edges, type_ = u_edge_data[ (s, t, v) ]
+        u_edge_data[ (s, t, v) ] = length, score, edges, "repeat_bridge"
+
     ug = ug2
-
-    # identify spurs in the utg graph
-    # Currently, we use ad-hoc logic filtering out shorter utg, but we ca
-    # add proper alignment comparison later to remove redundant utgs 
-
 
     with open("utg_data","w") as f:
         for s, t, v in u_edge_data:
@@ -1357,8 +1258,6 @@ if __name__ == "__main__":
             else:
                 path_or_edges = "~".join( path_or_edges )
             print >>f, s, v, t, type_, length, score, path_or_edges
-
-
 
     # contig construction from utgs
 
