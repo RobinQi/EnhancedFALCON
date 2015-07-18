@@ -1,4 +1,4 @@
-#!/home/yunfeiguo/Downloads/falcon_install/wanglab_falcon_trial_installation/fc_env/bin/python
+#!/home/yunfeiguo/Downloads/falcon_install/wanglab_falcon_trial_installation_with_new_ovlp_algm/fc_env/bin/python
 
 #################################################################################$$
 # Copyright (c) 2011-2014, Pacific Biosciences of California, Inc.
@@ -522,16 +522,20 @@ def create_merge_tasks(wd, db_prefix, input_dep, config):
 
 def convertNodeTemplate2List (l):
     result = []
-    matchObj = re.match(r'(.*)\[(\d+)-(\d+)\]',l)
-    if matchObj:
-        prefix = matchObj.groups()[0]
-        start = int(matchObj.groups()[1])
-        end = int(matchObj.groups()[2])
-	for i in range(start,end+1):
-            result.append(prefix + str(i))
-    else:
-        print 'compute-0-[0-31] expected for node_template'
-        sys.exit(1)
+    for nodes in l.split(','):
+	if re.match(r'.*?\[.*?\]',nodes):
+            matchObj = re.match(r'(.*)\[(\d+)-(\d+)\]',nodes)
+    	    if matchObj:
+                prefix = matchObj.groups()[0]
+                start = int(matchObj.groups()[1])
+                end = int(matchObj.groups()[2])
+	        for i in range(start,end+1):
+                    result.append(prefix + str(i))
+            else:
+                print 'compute-0-[0-31],compute-1-[0-1] expected for node_template'
+                sys.exit(1)
+	else: #no [] in node template
+	    result.append(nodes)
     return result
 
 def get_config(config_fn):
