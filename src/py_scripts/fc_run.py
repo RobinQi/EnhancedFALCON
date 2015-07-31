@@ -229,7 +229,7 @@ def run_daligner(self):
     script.append( "hostname >> %s" % log_path )
     script.append( "date >> %s" % log_path )
             #do alignment, copy output to remote dir
-    script.append( "/usr/bin/time "+ daligner_cmd + ( " >> %s 2>&1 " % log_path ) + ( " && (cp *.las $CWD | true) " ) + ( " && cd $CWD ") +
+    script.append( "/usr/bin/time "+ daligner_cmd + ( " >> %s 2>&1 " % log_path ) + ( r' && (shopt -s nullglob && files=(*.las) && if [[ ${#files[@]} -ne 0 ]]; then cp "${files[@]}" $CWD; fi)') + ( " && cd $CWD ") +
 	    ( " && touch %s" % fn( self.job_done ) ) )
 
     for p_id in xrange( 1, nblock+1 ):
@@ -334,7 +334,9 @@ def run_consensus_task(self):
 	else:
 	    print >> c_script, """LA4Falcon -H%d -o -f:%s %s.%d.las | """ % (length_cutoff, prefix, prefix, job_id),
 	print >> c_script, """fc_consensus.py %s > %s""" % (falcon_sense_option, os.path.basename(fn(self.out_file)))
-	print >> c_script, "(cp %s %s | true)" % (os.path.basename(fn(self.out_file)),fn(self.out_file))
+	#print >> c_script, "(cp %s %s | true)" % (os.path.basename(fn(self.out_file)),fn(self.out_file))
+	#we should not use true here, otherwise we don't if this job has succeeded or not
+	print >> c_script, "cp %s %s" % (os.path.basename(fn(self.out_file)),fn(self.out_file))
 	print >> c_script, "cd $CWD"
 
     script = []
@@ -479,7 +481,9 @@ def create_merge_tasks(wd, db_prefix, input_dep, config):
 		print >> merge_script, l
             #copy output to remote dir
 	    print >> merge_script, "cd $CWD"
-	    print >> merge_script, "(cp $TMPDIR/%s.%d.las %s.%d.las | true)" % (db_prefix,p_id,db_prefix,p_id)
+	    #print >> merge_script, "(cp $TMPDIR/%s.%d.las %s.%d.las | true)" % (db_prefix,p_id,db_prefix,p_id)
+	    #we should not use true here, as we will not know if this job has succeeded
+	    print >> merge_script, "cp $TMPDIR/%s.%d.las %s.%d.las" % (db_prefix,p_id,db_prefix,p_id)
 	    print >> merge_script, "ln -sf ../m_%05d/%s.%d.las ../las_files" % (p_id, db_prefix, p_id) 
 	    print >> merge_script, "ln -sf ./m_%05d/%s.%d.las .. " % (p_id, db_prefix, p_id) 
             
