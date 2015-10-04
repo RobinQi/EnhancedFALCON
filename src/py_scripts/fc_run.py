@@ -162,10 +162,10 @@ def build_rdb(self):
 	#copy the DB files to tmpdir_for_daligner_input, just to reduce IO burden on storage node
 	#use '| true' to let it time out silently in case some nodes are not responsive
 	for i in config["node_template"]:
-	    script_file.write("timeout %s ssh %s mkdir %s | true\n" %(config["ssh_timeout"],i, config["tmpdir_for_daligner_input"]))
-	    script_file.write("timeout %s ssh %s cp %s %s | true\n" % (config["ssh_timeout"],i, input_db, config["tmpdir_for_daligner_input"]))
-	    script_file.write("timeout %s ssh %s cp %s %s | true\n" % (config["ssh_timeout"],i, input_bps, config["tmpdir_for_daligner_input"]))
-	    script_file.write("timeout %s ssh %s cp %s %s | true\n" % (config["ssh_timeout"],i, input_idx, config["tmpdir_for_daligner_input"]))
+	    script_file.write("timeout %s ssh -f %s mkdir %s | true\n" %(config["ssh_timeout"],i, config["tmpdir_for_daligner_input"]))
+	    script_file.write("timeout %s ssh -f %s cp %s %s | true\n" % (config["ssh_timeout"],i, input_db, config["tmpdir_for_daligner_input"]))
+	    script_file.write("timeout %s ssh -f %s cp %s %s | true\n" % (config["ssh_timeout"],i, input_bps, config["tmpdir_for_daligner_input"]))
+	    script_file.write("timeout %s ssh -f %s cp %s %s | true\n" % (config["ssh_timeout"],i, input_idx, config["tmpdir_for_daligner_input"]))
         script_file.write("touch {rdb_build_done}\n".format(rdb_build_done = fn(rdb_build_done)))
 
     job_name = self.URL.split("/")[-1]
@@ -817,10 +817,10 @@ if __name__ == '__main__':
 	#copy the DB files to tmpdir_for_daligner_input, just to reduce IO burden on storage node
 	#use '| true' to let it time out silently in case some nodes are not responsive
 	for i in config["node_template"]:
-	    os.system("timeout %s ssh %s mkdir %s | true" %(config["ssh_timeout"],i, config["tmpdir_for_daligner_input"]))
-	    os.system("timeout %s ssh %s cp %s %s | true" % (config["ssh_timeout"],i, input_db,config["tmpdir_for_daligner_input"]))
-	    os.system("timeout %s ssh %s cp %s %s | true" % (config["ssh_timeout"],i, input_idx,config["tmpdir_for_daligner_input"]))
-	    os.system("timeout %s ssh %s cp %s %s | true" % (config["ssh_timeout"],i, input_bps,config["tmpdir_for_daligner_input"]))
+	    os.system("timeout %s ssh -f %s mkdir %s | true" %(config["ssh_timeout"],i, config["tmpdir_for_daligner_input"]))
+	    os.system("timeout %s ssh -f %s cp %s %s | true" % (config["ssh_timeout"],i, input_db,config["tmpdir_for_daligner_input"]))
+	    os.system("timeout %s ssh -f %s cp %s %s | true" % (config["ssh_timeout"],i, input_idx,config["tmpdir_for_daligner_input"]))
+	    os.system("timeout %s ssh -f %s cp %s %s | true" % (config["ssh_timeout"],i, input_bps,config["tmpdir_for_daligner_input"]))
         os.system("cd %s; touch rdb_build_done" % pread_dir)
 
     wf.addTask(build_p_rdb_task)
