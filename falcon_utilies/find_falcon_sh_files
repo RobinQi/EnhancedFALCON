@@ -1,0 +1,56 @@
+#!/usr/bin/env perl
+#find all sh files in falcon directories
+
+use strict;
+use warnings;
+use File::Spec;
+
+my $usage = "Usage: $0 [current wd (by default) or falcon root dir containing 0-rawreads,1-preads_ovl,2-asm-falcon]\n";
+die $usage unless @ARGV <= 1;
+warn $usage if @ARGV == 0;
+my $dir;
+if(@ARGV == 0) {
+    $dir = $ENV{PWD};
+} else {
+    $dir = shift @ARGV;
+}
+my @subdir = qw/0-rawreads 1-preads_ovl 2-asm-falcon/;
+@subdir = map {File::Spec->catfile($dir,$_)} @subdir;
+my $output;
+my $reg = "\\.sh\$";
+
+#check dir
+for my $i($dir,@subdir) {
+    die "$i not found\n" unless -d $i;
+}
+
+for my $i(@subdir) {
+#count total jobs
+    warn "Processing $i\n";
+    
+    opendir (DIR, $i) or die "Error: cannot read from dir $i\n";
+    my @alldir = readdir(DIR);
+    my @founddir = grep { m/^m_/ || m/^job_/ } @alldir;
+    closedir (DIR);
+    
+    #{my $subtotal = `find $i -name 'm_*' -type d -o -name 'job_*' -type d| wc -l`;
+	#$subtotal =~ s/(\d+).*/$1/s; #use 's' to let . match \n
+	#$total += $subtotal;
+    #}
+
+    if($i =~ /0-rawreads/) {
+	#count preads c_xxxx.sh jobs
+		push @founddir, 'preads';
+    }
+
+#count finished jobs
+    for my $j (0 .. @founddir-1) {
+    	my $nextdir = $founddir[$j];
+    	opendir (DIR, "$i/$nextdir") or die "Error: cannot read from directory $i/$nextdir\n";
+    	my @foundfile = grep { m/$reg/ } readdir (DIR);
+    	#@foundfile or die "not done in $i/$nextdir";
+	map {print File::Spec->catfile($i,$nextdir,$_),"\n"} @foundfile;
+    	print STDERR "Scanning subfolders: ",sprintf("%.2f", ($j+1)/@founddir*100), "% completed\r";
+	closedir(DIR);
+    }
+}

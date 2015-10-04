@@ -1,0 +1,34 @@
+#!/bin/bash
+set -e
+
+source /home/yunfeiguo/Downloads/falcon_install/fc_env/bin/activate
+#for try_kw_20150412
+if [ 1 -eq 1 ]; then
+stats="kw_ovlp.stats"
+pdf="kw_ovlp_hist.pdf"
+fofn="/home/yunfeiguo/projects/PacBio_reference_genome/falcon_aln/try_kw_20150412/2-asm-falcon/las.fofn"
+#fc_ovlp_stats.py --n_core 20 --fofn $fofn > $stats
+Rscript plot_repeat_hist.R $stats $pdf
+echo "$pdf done"
+fi
+
+
+#wildrice
+if [ 1 -eq 1 ]; then
+stats="wildrice_ovlp.stats"
+pdf="wildrice_ovlp_hist.pdf"
+fofn="/home/kaiwang/project/Col-Nextomics/wildrice_wuhan/2-asm-falcon/las.fofn"
+#fc_ovlp_stats.py --n_core 20 --fofn $fofn > $stats
+Rscript plot_repeat_hist.R $stats $pdf
+echo "$pdf done"
+fi
+
+#CHM1
+if [ 1 -eq 1 ]; then
+stats="chm1_ovlp.stats"
+pdf="chm1_ovlp_hist.pdf"
+fofn="/home/yunfeiguo/projects/PacBio_reference_genome/falcon_aln/try_CHM1_20150311/2-asm-falcon/las.fofn"
+fc_ovlp_stats.py --n_core 20 --fofn $fofn > $stats
+Rscript plot_repeat_hist.R $stats $pdf
+echo "$pdf done"
+fi
