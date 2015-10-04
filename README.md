@@ -1,3 +1,9 @@
+EnhancedFALCON
+===============
+
+EnhancedFALCON is a modified version of the FALCON software for genome assembly from long-read sequencing. Its performance is significantly improved for users with a cluster environment where all nodes access files through NFS from a central NFS server. Additionally, it includes several custom scripts for real-time monitoring of job progress, for summarizing the assembly results, and for troubleshooting potential errors during assembly.
+
+
 Falcon
 ===========
 
